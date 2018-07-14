@@ -12,6 +12,11 @@ using namespace boost;
 
 class clienteBoost
 {
+private:
+    enum delay{
+        min = 100,
+        max = 500
+    };
 public:
     clienteBoost(const std::string &ipAddress, const unsigned int &portNum);
 
