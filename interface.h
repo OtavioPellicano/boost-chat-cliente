@@ -11,13 +11,21 @@
 
 class Interface
 {
+private:
+    enum delay{
+        min = 250,
+        max = 500
+    };
+
 public:
     Interface();
+    virtual ~Interface();
 
     void mainLoop(clienteBoost *clt, thread_group *threads);
 
 private:
     bool validarNickname();
+    void displayUsers();
 
 private:
 
@@ -27,7 +35,10 @@ private:
 
     clienteBoost* mClt;
     std::string mNickname;
-    std::vector<std::string> mVecUsuarios;
+    size_t mId;
+    opmm::StringCsv mStrCsvUsuarios;
+
+    boost::thread_group* mThreads;
 
 };
 

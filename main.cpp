@@ -12,7 +12,13 @@ int main()
     Interface *ui;
     boost::thread_group threads;
 
-    clt = new clienteBoost("127.0.0.1", 1312);
+    try {
+        clt = new clienteBoost("127.0.0.1", 1312);
+    } catch (boost::system::system_error &e) {
+        cerr << "Servidor desconectado.\nErro: " << e.code() << " - " << e.what() << endl;
+        return e.code().value();
+    }
+
     ui = new Interface();
 
     boost::thread t1(std::bind(&clienteBoost::readyReadLoop, clt));
@@ -27,8 +33,9 @@ int main()
 
     threads.join_all();
 
-    delete clt;
-    delete ui;
+//    delete ui;
+//    delete clt;
+
 
     return 0;
 }

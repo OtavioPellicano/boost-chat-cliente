@@ -5,22 +5,57 @@ Interface::Interface()
 
 }
 
+Interface::~Interface()
+{
+    mClt->pushSenderQueue("###:");
+    boost::this_thread::sleep( boost::posix_time::millisec(delay::max));
+    mThreads->interrupt_all();
+}
+
 void Interface::mainLoop(clienteBoost *clt, boost::thread_group* threads)
 {
 
     mClt = clt;
-
+    mThreads = threads;
     if(!validarNickname())
     {
+        mClt->pushSenderQueue("###:");
+        boost::this_thread::sleep( boost::posix_time::millisec(delay::max));
         threads->interrupt_all();
     }
 
     for(;;)
     {
 
+        if(!mClt->reveiverQueueIsEmpty())
+        {
+            Mensagem msgRcv(mClt->getAndPopReceiverQueue());
+
+            //Atualizacao de usuários conectados
+            if(msgRcv.origem() == BROADCAST_KEY && msgRcv.destino() == BROADCAST_CONECTADO)
+            {
+                mStrCsvUsuarios.setStr(msgRcv.mensagem());
+                displayUsers();
+                continue;
+            }
+
+            //Atualizacao de usuários desconectados
+            if(msgRcv.origem() == BROADCAST_KEY && msgRcv.destino() == BROADCAST_DESCONECTADO)
+            {
+                mStrCsvUsuarios.setStr(msgRcv.mensagem());
+                displayUsers();
+                continue;
+            }
+
+        }
+        boost::this_thread::sleep( boost::posix_time::millisec(delay::min));
+
     }
 
 
+    //mandando mensagem de desconexao
+    mClt->pushSenderQueue("###:");
+    boost::this_thread::sleep( boost::posix_time::millisec(delay::max));
     threads->interrupt_all();
 }
 
@@ -36,7 +71,7 @@ bool Interface::validarNickname()
     msg.setCorpo("");
 
     mClt->pushSenderQueue(msg.mensagemEstruturada());
-
+    boost::this_thread::sleep( boost::posix_time::millisec(delay::min));
 
     while(!mClt->reveiverQueueIsEmpty())
     {
@@ -45,22 +80,27 @@ bool Interface::validarNickname()
         //se o nickname é invalido
         if(msgRcv.origem().empty() && msgRcv.destino().empty())
         {
-            cerr << "nickname existente!" << endl;
+            cout << "nickname existente!" << endl;
             return false;
         }
 
         //se o nickname é valido
         if(!msgRcv.origem().empty() && msgRcv.destino().empty())
         {
+            cout << "nickname valido" << endl;
             mNickname = msgRcv.origem();
+            boost::this_thread::sleep( boost::posix_time::millisec(delay::min));
             continue;
         }
 
         //recebendo o primeiro broadcast de usuários conectados
         if(msgRcv.origem() == BROADCAST_KEY && msgRcv.destino() == BROADCAST_CONECTADO)
         {
-
+            cout << "broadcast conectado" << endl;
+            mStrCsvUsuarios.setStr(msgRcv.mensagem());
+            displayUsers();
         }
+
 
 //        if(){}
 
@@ -159,4 +199,17 @@ bool Interface::validarNickname()
 
 
 
+}
+
+void Interface::displayUsers()
+{
+    std::string display = "Usuarios online (" + std::to_string(mStrCsvUsuarios.size() - 1) + ")\n";
+    for(size_t i = 0; i < mStrCsvUsuarios.size(); ++i)
+    {
+        if(mStrCsvUsuarios[i] != mNickname)
+            display += std::to_string(i) + " - " + mStrCsvUsuarios[i] + "\n";
+        else
+            mId = i;
+    }
+    std::cout << display;
 }
