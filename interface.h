@@ -3,31 +3,40 @@
 
 #include <iostream>
 #include <vector>
+#include <algorithm>
+#include <string>
 
 #include "clienteboost.h"
 #include "mensagem.h"
-#include "opmm-StringCsv/StringCsv.h"
+
 
 
 class Interface
 {
 private:
     enum delay{
-        min = 250,
-        max = 500
+        min = 400,
+        max = 800
     };
 
 public:
-    Interface();
+    Interface(clienteBoost* clt, thread_group* threads);
     virtual ~Interface();
 
-    void mainLoop(clienteBoost *clt, thread_group *threads);
+    void mainLoop();
+    void senderLoop();
 
 private:
     bool validarNickname();
     void displayUsers();
 
+    void split(std::vector<std::string>& vec, std::string str, const char& delimiter = ';');
+
+    void popUser();
+
 private:
+
+
 
     const std::string BROADCAST_KEY = "$$$";
     const std::string BROADCAST_CONECTADO = "$c$";
@@ -36,9 +45,13 @@ private:
     clienteBoost* mClt;
     std::string mNickname;
     size_t mId;
-    opmm::StringCsv mStrCsvUsuarios;
+    std::string mDestino;
+    std::string mIdDestino;
+    std::vector<std::string> mVecUsuarios;
 
     boost::thread_group* mThreads;
+
+    bool mFlagConectado;
 
 };
 

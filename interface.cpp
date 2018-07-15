@@ -1,62 +1,101 @@
 #include "interface.h"
 
-Interface::Interface()
+Interface::Interface(clienteBoost *clt, thread_group *threads)
+    :mClt(clt), mThreads(threads), mFlagConectado(false)
 {
 
 }
 
 Interface::~Interface()
 {
+    std::cout << "destructor" << std::endl;
     mClt->pushSenderQueue("###:");
     boost::this_thread::sleep( boost::posix_time::millisec(delay::max));
     mThreads->interrupt_all();
+    delete mClt;
+    delete mThreads;
 }
 
-void Interface::mainLoop(clienteBoost *clt, boost::thread_group* threads)
+void Interface::mainLoop()
 {
 
-    mClt = clt;
-    mThreads = threads;
+    for(;;)
+    {
+        if(mFlagConectado)
+        {
+            if(!mClt->reveiverQueueIsEmpty())
+            {
+                Mensagem msgRcv(mClt->getAndPopReceiverQueue());
+
+                //Atualizacao de usuários conectados
+                if(msgRcv.origem() == BROADCAST_KEY && msgRcv.destino() == BROADCAST_CONECTADO)
+                {
+                    split(mVecUsuarios, msgRcv.mensagem());
+                    displayUsers();
+                    continue;
+                }
+
+                //Atualizacao de usuários desconectados
+                if(msgRcv.origem() == BROADCAST_KEY && msgRcv.destino() == BROADCAST_DESCONECTADO)
+                {
+
+                    std::cout << "entrei" << std::endl;
+                    split(mVecUsuarios, msgRcv.mensagem());
+                    std::string userDesconect = mVecUsuarios[mVecUsuarios.size() - 1];
+                    popUser();
+                    if(userDesconect == mNickname)
+                    {
+                        break;
+                    }
+
+                    displayUsers();
+                    continue;
+
+                }
+
+            }
+            boost::this_thread::sleep( boost::posix_time::millisec(delay::min));
+
+        }
+
+    }
+
+
+
+}
+
+void Interface::senderLoop()
+{
+    using namespace std;
+
     if(!validarNickname())
     {
         mClt->pushSenderQueue("###:");
         boost::this_thread::sleep( boost::posix_time::millisec(delay::max));
-        threads->interrupt_all();
+        mThreads->interrupt_all();
     }
+
+    mFlagConectado = true;
+
+    std::string strMsg;
 
     for(;;)
     {
+        getline(cin, strMsg);
 
-        if(!mClt->reveiverQueueIsEmpty())
-        {
-            Mensagem msgRcv(mClt->getAndPopReceiverQueue());
 
-            //Atualizacao de usuários conectados
-            if(msgRcv.origem() == BROADCAST_KEY && msgRcv.destino() == BROADCAST_CONECTADO)
-            {
-                mStrCsvUsuarios.setStr(msgRcv.mensagem());
-                displayUsers();
-                continue;
-            }
 
-            //Atualizacao de usuários desconectados
-            if(msgRcv.origem() == BROADCAST_KEY && msgRcv.destino() == BROADCAST_DESCONECTADO)
-            {
-                mStrCsvUsuarios.setStr(msgRcv.mensagem());
-                displayUsers();
-                continue;
-            }
 
-        }
-        boost::this_thread::sleep( boost::posix_time::millisec(delay::min));
+        if(strMsg == "sair")
+            break;
+
 
     }
-
 
     //mandando mensagem de desconexao
     mClt->pushSenderQueue("###:");
     boost::this_thread::sleep( boost::posix_time::millisec(delay::max));
-    threads->interrupt_all();
+    mThreads->interrupt_all();
 }
 
 bool Interface::validarNickname()
@@ -97,13 +136,10 @@ bool Interface::validarNickname()
         if(msgRcv.origem() == BROADCAST_KEY && msgRcv.destino() == BROADCAST_CONECTADO)
         {
             cout << "broadcast conectado" << endl;
-            mStrCsvUsuarios.setStr(msgRcv.mensagem());
+            split(mVecUsuarios, msgRcv.mensagem());
+
             displayUsers();
         }
-
-
-//        if(){}
-
 
     }
 
@@ -203,13 +239,37 @@ bool Interface::validarNickname()
 
 void Interface::displayUsers()
 {
-    std::string display = "Usuarios online (" + std::to_string(mStrCsvUsuarios.size() - 1) + ")\n";
-    for(size_t i = 0; i < mStrCsvUsuarios.size(); ++i)
+    std::string display = "Usuarios online (" + std::to_string(mVecUsuarios.size() - 1) + ")\n";
+    for(size_t i = 0; i < mVecUsuarios.size(); ++i)
     {
-        if(mStrCsvUsuarios[i] != mNickname)
-            display += std::to_string(i) + " - " + mStrCsvUsuarios[i] + "\n";
+        if(mVecUsuarios[i] != mNickname)
+            display += std::to_string(i) + " - " + mVecUsuarios[i] + "\n";
         else
             mId = i;
     }
     std::cout << display;
+}
+
+void Interface::split(std::vector<std::string> &vec, std::string str, const char &delimiter)
+{
+    vec.clear();
+    if(str.empty())
+        return;
+
+    std::string::iterator itFirst = str.begin();
+    std::string::iterator itSecond;
+    vec.reserve(std::count(str.begin(), str.end(), delimiter) + 1);
+    while((itSecond = std::find(itFirst, str.end(), delimiter)) != str.end())
+    {
+        vec.push_back(std::string(itFirst, itSecond));
+
+        itFirst = itSecond + 1;
+    }
+    vec.push_back(std::string(itFirst, itSecond));
+}
+
+void Interface::popUser()
+{
+    mVecUsuarios.erase(mVecUsuarios.end() - 1);
+    mVecUsuarios.shrink_to_fit();
 }
